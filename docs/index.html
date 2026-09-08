@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="google-site-verification" content="REPLACE_WITH_SEARCH_CONSOLE_CODE">
+<title>Hisab Master — Expense &amp; Income Tracker</title>
+<style>
+  :root { --brand:#146C43; --dark:#0B3D2E; --mint:#6FE3B0; }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'Segoe UI',system-ui,sans-serif; background:#F6F8F6; color:#17251d; }
+  .hero { background:linear-gradient(135deg,var(--dark),var(--brand) 55%,#1E8A5A); color:#fff;
+          padding:90px 20px 110px; text-align:center; position:relative; overflow:hidden; }
+  .hero::after { content:""; position:absolute; width:340px; height:340px; border-radius:50%;
+          background:radial-gradient(circle,rgba(111,227,176,.35),transparent 70%); top:-120px; right:-80px; }
+  .logo { width:86px; height:86px; margin:0 auto 18px; border-radius:24px;
+          background:rgba(255,255,255,.14); border:1px solid rgba(255,255,255,.35);
+          display:flex; align-items:center; justify-content:center; font-size:44px;
+          box-shadow:0 10px 40px rgba(111,227,176,.35); }
+  h1 { font-size:44px; letter-spacing:-1px; }
+  .tag { opacity:.85; margin-top:10px; font-size:18px; }
+  .badge { display:inline-block; margin-top:26px; background:#fff; color:var(--brand);
+          padding:12px 26px; border-radius:30px; font-weight:700; text-decoration:none; }
+  .wrap { max-width:980px; margin:-50px auto 60px; padding:0 20px; position:relative; }
+  .cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:18px; }
+  .card { background:#fff; border:1px solid rgba(0,0,0,.06); border-radius:18px; padding:24px;
+          box-shadow:0 6px 24px rgba(11,61,46,.07); }
+  .card h3 { color:var(--brand); margin-bottom:8px; font-size:17px; }
+  .card p { font-size:14px; color:#4b5a52; line-height:1.55; }
+  .ic { font-size:26px; margin-bottom:10px; }
+  footer { text-align:center; padding:34px 20px; font-size:13px; color:#69766e; }
+  footer a { color:var(--brand); text-decoration:none; margin:0 8px; }
+  h2 { text-align:center; margin:46px 0 22px; font-size:26px; color:var(--dark); }
+</style>
+</head>
+<body>
+  <div class="hero">
+    <div class="logo">🧮</div>
+    <h1>Hisab Master</h1>
+    <div class="tag">Ayar–khorocher shob hisab ek app e — offline cholbe, online sync hobe</div>
+    <a class="badge" href="https://github.com/imsaad8878/hisab-master">★ View on GitHub</a>
+  </div>
+  <div class="wrap">
+    <div class="cards">
+      <div class="card"><div class="ic">📇</div><h3>Track Everything</h3>
+        <p>Income &amp; expense entries with categories, notes, dates — plus your own custom categories.</p></div>
+      <div class="card"><div class="ic">📊</div><h3>Smart Analytics</h3>
+        <p>Monthly &amp; yearly charts, category breakdown, savings summary — instantly.</p></div>
+      <div class="card"><div class="ic">📶</div><h3>Offline First</h3>
+        <p>No internet? No problem. Data saves locally and auto-syncs to the cloud when you're back online.</p></div>
+      <div class="card"><div class="ic">🔐</div><h3>Your Data, Yours</h3>
+        <p>Google/email sign-in with per-user private storage. Install on a new phone, log in, everything's back.</p></div>
+    </div>
+    <h2>Download</h2>
+    <div class="cards">
+      <div class="card"><div class="ic">🤖</div><h3>Android</h3>
+        <p>Get the APK from <a href="https://github.com/imsaad8878/hisab-master/releases">GitHub Releases</a>.
+        Install, sign in, done.</p></div>
+      <div class="card"><div class="ic">💻</div><h3>Source Code</h3>
+        <p>Built with Flutter &amp; Firebase.
+        <a href="https://github.com/imsaad8878/hisab-master">Browse the repo</a>.</p></div>
+    </div>
+  </div>
+  <footer>
+    © 2026 Hisab Master · Developed by Md Sohhan Islam
+    &nbsp;·&nbsp;
+    <a href="privacy.html">Privacy Policy</a>
+    <a href="terms.html">Terms of Service</a>
+    <a href="mailto:mdsohanislam9909@gmail.com">Contact</a>
+  </footer>
+</body>
+</html>
