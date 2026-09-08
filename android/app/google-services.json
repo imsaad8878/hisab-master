@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "273850587174",
+    "project_id": "hisab-master-bcede",
+    "storage_bucket": "hisab-master-bcede.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:273850587174:android:c80c991708431a0c016ee7",
+        "android_client_info": {
+          "package_name": "com.saad.hisabmaster"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDUVQT18xcvRr2rV3yb4S6gJG_TNxwC7nA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
