@@ -35,7 +35,7 @@ class UserProfileRepository {
   Future<void> initLocal() => _initFuture ??= _initLocal();
 
   Future<void> _initLocal() async {
-    if (FirebaseService.ready) return;
+    if (FirebaseService.useLocal) return;
     try {
       final prefs = await SharedPreferences.getInstance();
       final raw = prefs.getString(_prefsKey);
@@ -50,7 +50,7 @@ class UserProfileRepository {
   }
 
   Stream<Map<String, dynamic>> watch(String uid) async* {
-    if (!FirebaseService.ready) {
+    if (!FirebaseService.useLocal) {
       await initLocal();
       yield _localCache;
       yield* _localController.stream;
@@ -61,7 +61,7 @@ class UserProfileRepository {
   }
 
   Future<void> _write(String uid, Map<String, dynamic> patch) async {
-    if (!FirebaseService.ready) {
+    if (!FirebaseService.useLocal) {
       await initLocal();
       _localCache = {..._localCache, ...patch};
       _localController.add(_localCache);

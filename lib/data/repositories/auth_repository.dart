@@ -36,7 +36,7 @@ class AuthRepository {
   bool _demoSignedIn = false;
 
   Stream<AppUser?> authStateChanges() {
-    if (!FirebaseService.ready) {
+    if (FirebaseService.useLocal) {
       return _demoController.stream;
     }
     // userChanges() also fires on profile reloads, so an email that was
@@ -50,25 +50,29 @@ class AuthRepository {
   /// `emailVerified` is cached until reload() is called — without this a
   /// verified Gmail keeps showing "Email not verified" in settings.
   Future<void> refreshUser() async {
-    if (!FirebaseService.ready) return;
+    if (!FirebaseService.ready || FirebaseService.demoMode) return;
     try {
       await FirebaseAuth.instance.currentUser?.reload();
     } catch (_) {}
   }
 
   AppUser? get currentUser {
-    if (!FirebaseService.ready) return _demoSignedIn ? demoUser : null;
+    if (FirebaseService.useLocal) return _demoSignedIn ? demoUser : null;
     final u = FirebaseAuth.instance.currentUser;
     return u == null ? null : _toAppUser(u);
   }
 
+  /// Offline mode: everything is saved on the device only. Works with or
+  /// without Firebase configured, and without internet or an account.
   void continueAsDemo() {
+    FirebaseService.demoMode = true;
     _demoSignedIn = true;
     _demoController.add(demoUser);
   }
 
   Future<void> signOut() async {
-    if (!FirebaseService.ready) {
+    if (FirebaseService.useLocal) {
+      FirebaseService.demoMode = false;
       _demoSignedIn = false;
       _demoController.add(null);
       return;
@@ -81,6 +85,11 @@ class AuthRepository {
       ).signOut();
     } catch (_) {}
     await FirebaseAuth.instance.signOut();
+  }
+
+  void _exitDemoMode() {
+    FirebaseService.demoMode = false;
+    _demoSignedIn = false;
   }
 
   Future<String> signInWithGoogle() async {
@@ -103,6 +112,7 @@ class AuthRepository {
       }
       final credential = GoogleAuthProvider.credential(idToken: idToken);
       await FirebaseAuth.instance.signInWithCredential(credential);
+      _exitDemoMode();
       return '';
     } on FirebaseAuthException catch (e) {
       return _message(e);
@@ -116,6 +126,7 @@ class AuthRepository {
     try {
       await FirebaseAuth.instance
           .signInWithEmailAndPassword(email: email.trim(), password: password);
+      _exitDemoMode();
       return '';
     } on FirebaseAuthException catch (e) {
       return _message(e);
@@ -130,6 +141,7 @@ class AuthRepository {
           .createUserWithEmailAndPassword(email: email.trim(), password: password);
       await cred.user?.updateDisplayName(name.trim());
       await cred.user?.sendEmailVerification();
+      _exitDemoMode();
       return '';
     } on FirebaseAuthException catch (e) {
       return _message(e);

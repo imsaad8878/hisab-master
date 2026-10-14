@@ -486,19 +486,23 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 ListTile(
                   leading: const Icon(Icons.cloud_done_outlined),
                   title: const Text('Sync status'),
-                  subtitle: Text(pending > 0
-                      ? '$pending change(s) waiting for internet'
-                      : FirebaseService.ready
-                          ? 'All data synced with Firebase'
-                          : 'Demo mode — data saved on this device only'),
+                  subtitle: Text(FirebaseService.demoMode
+                      ? 'Offline mode — data saved on this device only'
+                      : pending > 0
+                          ? '$pending change(s) waiting for internet'
+                          : FirebaseService.ready
+                              ? 'All data synced with Firebase'
+                              : 'Demo mode — data saved on this device only'),
                 ),
                 const Divider(height: 1, indent: 56),
                 ListTile(
                   leading: const Icon(Icons.cloud_outlined),
                   title: const Text('Backend'),
-                  subtitle: Text(isFallbackOptions
-                      ? 'Local demo mode (no Firebase yet)'
-                      : 'Firebase Firestore'),
+                  subtitle: Text(FirebaseService.demoMode
+                      ? 'Offline mode — data saved on this device'
+                      : isFallbackOptions
+                          ? 'Local demo mode (no Firebase yet)'
+                          : 'Firebase Firestore'),
                 ),
               ],
             ),

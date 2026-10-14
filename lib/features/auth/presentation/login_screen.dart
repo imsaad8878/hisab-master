@@ -357,7 +357,20 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                       .continueAsDemo(),
                                   icon:
                                       const Icon(Icons.phone_android_outlined),
-                                  label: const Text('Continue in demo mode'),
+                                  label: const Text('Continue offline'),
+                                ),
+                              )
+                            else
+                              Padding(
+                                padding: const EdgeInsets.only(top: 4),
+                                child: TextButton.icon(
+                                  onPressed: () => ref
+                                      .read(authRepositoryProvider)
+                                      .continueAsDemo(),
+                                  icon: const Icon(Icons.cloud_off_outlined,
+                                      size: 18),
+                                  label: const Text(
+                                      'Continue offline (data stays on this device)'),
                                 ),
                               ),
                           ],

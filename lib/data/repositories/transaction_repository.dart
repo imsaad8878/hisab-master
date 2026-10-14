@@ -48,7 +48,7 @@ class TransactionRepository {
   Future<void> initLocal() => _initFuture ??= _initLocal();
 
   Future<void> _initLocal() async {
-    if (FirebaseService.ready) return;
+    if (FirebaseService.useLocal) return;
     try {
       final prefs = await SharedPreferences.getInstance();
       final raw = prefs.getString(_prefsKey);
@@ -140,7 +140,7 @@ class TransactionRepository {
   }
 
   Stream<List<TransactionModel>> watchTransactions(String uid) async* {
-    if (!FirebaseService.ready) {
+    if (!FirebaseService.useLocal) {
       await initLocal();
       yield _sorted(_localCache);
       yield* _localController.stream.map(_sorted);
@@ -156,7 +156,7 @@ class TransactionRepository {
 
   /// Number of writes still waiting to sync to the server.
   Stream<int> watchPendingCount(String uid) async* {
-    if (!FirebaseService.ready) {
+    if (!FirebaseService.useLocal) {
       yield 0;
       return;
     }
@@ -170,7 +170,7 @@ class TransactionRepository {
   }
 
   Future<void> addTransaction(String uid, TransactionModel t) async {
-    if (!FirebaseService.ready) {
+    if (!FirebaseService.useLocal) {
       await initLocal();
       final exists = _localCache.any((x) => x.id == t.id);
       await _emitLocal(exists
@@ -183,7 +183,7 @@ class TransactionRepository {
   }
 
   Future<void> updateTransaction(String uid, TransactionModel t) async {
-    if (!FirebaseService.ready) {
+    if (!FirebaseService.useLocal) {
       await initLocal();
       await _emitLocal([
         for (final x in _localCache) x.id == t.id ? t : x,
@@ -194,7 +194,7 @@ class TransactionRepository {
   }
 
   Future<void> deleteTransaction(String uid, String id) async {
-    if (!FirebaseService.ready) {
+    if (!FirebaseService.useLocal) {
       await initLocal();
       await _emitLocal(_localCache.where((x) => x.id != id).toList());
       return;
@@ -222,7 +222,8 @@ class TransactionRepository {
               final id = (m['id'] as String?) ?? '';
               if (id.isEmpty) continue;
               final t = TransactionModel.fromMap(id, m);
-              if (t.amount <= 0) continue;
+              // never push the auto-generated demo samples into a real account
+              if (t.amount <= 0 || t.note.startsWith('Demo:')) continue;
               batch.set(_col(uid).doc(id), t.toMap());
             }
             await batch.commit();

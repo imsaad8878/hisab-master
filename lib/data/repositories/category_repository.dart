@@ -34,7 +34,7 @@ class CategoryRepository {
   Future<void> initLocal() => _initFuture ??= _initLocal();
 
   Future<void> _initLocal() async {
-    if (FirebaseService.ready) return;
+    if (FirebaseService.useLocal) return;
     try {
       final prefs = await SharedPreferences.getInstance();
       final raw = prefs.getString(_prefsKey);
@@ -60,7 +60,7 @@ class CategoryRepository {
   }
 
   Stream<List<CategoryTag>> watchCategories(String uid) async* {
-    if (!FirebaseService.ready) {
+    if (!FirebaseService.useLocal) {
       await initLocal();
       yield _localCache;
       yield* _localController.stream;
@@ -97,7 +97,7 @@ class CategoryRepository {
     final dupDefault = kCategoriesByTypeName[type]!
         .any((c) => c.toLowerCase() == clean.toLowerCase());
     if (dupDefault) return 'Ei default category te ache already.';
-    if (!FirebaseService.ready) {
+    if (!FirebaseService.useLocal) {
       await initLocal();
       if (_localCache.any((c) =>
           c.type == type && c.name.toLowerCase() == clean.toLowerCase())) {
@@ -122,7 +122,7 @@ class CategoryRepository {
   }
 
   Future<void> deleteCategory(String uid, CategoryTag tag) async {
-    if (!FirebaseService.ready) {
+    if (!FirebaseService.useLocal) {
       await initLocal();
       await _emitLocal(_localCache
           .where((c) =>
