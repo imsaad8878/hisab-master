@@ -12,11 +12,61 @@ import '../../../providers/profile_providers.dart';
 import '../../../providers/transaction_providers.dart';
 import '../../../utils/avatar.dart';
 
-class ProfileScreen extends ConsumerWidget {
+class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends ConsumerState<ProfileScreen> {
+  bool _rechecking = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Email verify korle app e status ta cache thake — agei ekbar reload
+    // nite hobe, nahole verify koreo "Email not verified" dekhay.
+    Future.microtask(() => ref.read(authRepositoryProvider).refreshUser());
+  }
+
+  /// Re-reads the account from Firebase so a verified Gmail shows as
+  /// verified here immediately.
+  Future<void> _recheckVerification() async {
+    if (_rechecking) return;
+    setState(() => _rechecking = true);
+    final messenger = ScaffoldMessenger.of(context);
+    await ref.read(authRepositoryProvider).refreshUser();
+    if (!mounted) return;
+    setState(() => _rechecking = false);
+    final verified =
+        ref.read(authStateChangesProvider).valueOrNull?.emailVerified ?? false;
+    messenger.showSnackBar(SnackBar(
+      behavior: SnackBarBehavior.floating,
+      backgroundColor: verified ? const Color(0xFF2E7D32) : Colors.blueGrey,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      content: Row(
+        children: [
+          Icon(verified ? Icons.verified : Icons.mail_outline,
+              color: Colors.white, size: 20),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              verified
+                  ? 'Email verified — thank you!'
+                  : 'Email ekhono verify hoyni. Inbox ba Spam folder e '
+                      'verification link e click korun, tarpor abar recheck korun.',
+              style: const TextStyle(
+                  color: Colors.white, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
+      ),
+    ));
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final user = ref.watch(displayUserProvider);
     final pending = ref.watch(pendingSyncProvider).valueOrNull ?? 0;
     final theme = Theme.of(context);
@@ -363,32 +413,71 @@ class ProfileScreen extends ConsumerWidget {
               ],
             ),
           ),
-          if (user?.email != null && user!.emailVerified == false) ...[
-            const SizedBox(height: 12),
-            Card(
-              color: Colors.blue.withValues(alpha: 0.08),
-              child: ListTile(
-                leading: const Icon(Icons.email_outlined, color: Colors.blue),
-                title: const Text('Email not verified'),
-                subtitle:
-                    const Text('Verify your email to protect your account.'),
-                trailing: TextButton(
-                  onPressed: () async {
-                    final repo = ref.read(authRepositoryProvider);
-                    final messenger = ScaffoldMessenger.of(context);
-                    try {
-                      await repo.sendEmailVerification();
-                      messenger.showSnackBar(const SnackBar(
-                          content: Text('Verification email sent.')));
-                    } catch (e) {
-                      messenger.showSnackBar(
-                          SnackBar(content: Text('Error: $e')));
-                    }
-                  },
-                  child: const Text('Send'),
+          if (user?.email != null &&
+              user!.isAnonymous != true &&
+              FirebaseService.ready) ...[
+            if (!user.emailVerified) ...[
+              const SizedBox(height: 12),
+              Card(
+                color: Colors.blue.withValues(alpha: 0.08),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: ListTile(
+                    leading:
+                        const Icon(Icons.email_outlined, color: Colors.blue),
+                    title: const Text('Email not verified'),
+                    subtitle: const Text(
+                        'Verify your email to protect your account.'),
+                    trailing: Wrap(
+                      spacing: 4,
+                      children: [
+                        TextButton(
+                          onPressed: _rechecking
+                              ? null
+                              : () async {
+                                  final repo = ref.read(authRepositoryProvider);
+                                  final messenger =
+                                      ScaffoldMessenger.of(context);
+                                  try {
+                                    await repo.sendEmailVerification();
+                                    messenger.showSnackBar(const SnackBar(
+                                        content: Text(
+                                            'Verification email sent. Inbox ba Spam dekhen.')));
+                                  } catch (e) {
+                                    messenger.showSnackBar(
+                                        SnackBar(content: Text('Error: $e')));
+                                  }
+                                },
+                          child: const Text('Send'),
+                        ),
+                        FilledButton.tonal(
+                          onPressed:
+                              _rechecking ? null : _recheckVerification,
+                          child: _rechecking
+                              ? const SizedBox(
+                                  width: 14,
+                                  height: 14,
+                                  child: CircularProgressIndicator(
+                                      strokeWidth: 2))
+                              : const Text('Recheck'),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ),
-            ),
+            ] else ...[
+              const SizedBox(height: 12),
+              Card(
+                color: Colors.green.withValues(alpha: 0.08),
+                child: const ListTile(
+                  leading:
+                      Icon(Icons.verified_user_outlined, color: Colors.green),
+                  title: Text('Email verified'),
+                  subtitle: Text('Your account is protected.'),
+                ),
+              ),
+            ],
           ],
           const SizedBox(height: 12),
           Card(

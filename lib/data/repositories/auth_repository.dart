@@ -39,9 +39,21 @@ class AuthRepository {
     if (!FirebaseService.ready) {
       return _demoController.stream;
     }
-    return FirebaseAuth.instance.authStateChanges().map(
+    // userChanges() also fires on profile reloads, so an email that was
+    // verified in the browser updates the app after refreshUser().
+    return FirebaseAuth.instance.userChanges().map(
           (u) => u == null ? null : _toAppUser(u),
         );
+  }
+
+  /// Re-reads the signed-in account from Firebase. Needed because
+  /// `emailVerified` is cached until reload() is called — without this a
+  /// verified Gmail keeps showing "Email not verified" in settings.
+  Future<void> refreshUser() async {
+    if (!FirebaseService.ready) return;
+    try {
+      await FirebaseAuth.instance.currentUser?.reload();
+    } catch (_) {}
   }
 
   AppUser? get currentUser {

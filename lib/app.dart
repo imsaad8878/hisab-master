@@ -96,6 +96,13 @@ ThemeData _theme(Brightness brightness) {
           borderRadius: BorderRadius.all(Radius.circular(18))),
     ),
     dividerTheme: const DividerThemeData(thickness: 0.8),
+    snackBarTheme: SnackBarThemeData(
+      behavior: SnackBarBehavior.floating,
+      backgroundColor: isLight ? const Color(0xFF1F2A24) : scheme.inverseSurface,
+      contentTextStyle: const TextStyle(color: Colors.white, fontSize: 13.5),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      elevation: 6,
+    ),
   );
 }
 

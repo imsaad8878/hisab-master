@@ -43,6 +43,8 @@ class _AddTransactionFormState extends ConsumerState<_AddTransactionForm> {
   late DateTime _date = widget.existing?.dateTime ?? DateTime.now();
   final _amountCtrl = TextEditingController();
   final _noteCtrl = TextEditingController();
+  bool _saving = false;
+  String? _amountError;
 
   List<String> _categoriesFor(TransactionType t) {
     final customs =
@@ -178,13 +180,16 @@ class _AddTransactionFormState extends ConsumerState<_AddTransactionForm> {
   }
 
   Future<void> _save() async {
+    if (_saving) return; // double-tap e duplicate entry hobe na
     final amount = double.tryParse(_amountCtrl.text.trim());
     if (amount == null || amount <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Ekta thik amount likhun.')),
-      );
+      setState(() => _amountError = 'Ekta thik amount likhun (৳ 0 er beshi).');
       return;
     }
+    setState(() {
+      _saving = true;
+      _amountError = null;
+    });
     final repo = ref.read(transactionRepositoryProvider);
     final uid = ref.read(dataUidProvider);
     final model = TransactionModel(
@@ -195,12 +200,63 @@ class _AddTransactionFormState extends ConsumerState<_AddTransactionForm> {
       dateTime: _date,
       note: _noteCtrl.text.trim(),
     );
-    if (widget.existing == null) {
-      await repo.addTransaction(uid, model);
-    } else {
-      await repo.updateTransaction(uid, model);
+    final messenger = ScaffoldMessenger.of(context);
+    final theme = Theme.of(context);
+    try {
+      if (widget.existing == null) {
+        await repo.addTransaction(uid, model);
+      } else {
+        await repo.updateTransaction(uid, model);
+      }
+      if (!mounted) return;
+      Navigator.of(context).pop();
+      _showResultToast(messenger, theme, model, saved: true);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _saving = false);
+      _showResultToast(messenger, theme, model, saved: false, error: e);
     }
-    if (mounted) Navigator.of(context).pop();
+  }
+
+  /// Save porshesh e clear confirmation — amount, type ar category dekhay,
+  /// jate buja jay entry ta add hoyeche ki na.
+  void _showResultToast(ScaffoldMessengerState messenger, ThemeData theme,
+      TransactionModel t,
+      {required bool saved, Object? error}) {
+    final isExpense = t.type == TransactionType.expense;
+    final color = saved
+        ? (isExpense ? const Color(0xFFC62828) : const Color(0xFF2E7D32))
+        : theme.colorScheme.error;
+    final text = saved
+        ? '${widget.existing == null ? 'Added' : 'Updated'}: '
+            '${isExpense ? 'Expense' : 'Income'} ${Format.tk(t.amount)} • ${t.category}'
+        : 'Save hoy ni — ${error ?? 'unknown error'}';
+    messenger.showSnackBar(SnackBar(
+      behavior: SnackBarBehavior.floating,
+      backgroundColor: color,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+      duration: Duration(seconds: saved ? 3 : 4),
+      content: Row(
+        children: [
+          Icon(
+            saved
+                ? (isExpense ? Icons.south_west : Icons.north_east)
+                : Icons.error_outline,
+            color: Colors.white,
+            size: 20,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(
+                  color: Colors.white, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
+      ),
+    ));
   }
 
   @override
@@ -247,13 +303,21 @@ class _AddTransactionFormState extends ConsumerState<_AddTransactionForm> {
               autofocus: widget.existing == null,
               keyboardType:
                   const TextInputType.numberWithOptions(decimal: true),
+              onChanged: (_) {
+                if (_amountError != null) setState(() => _amountError = null);
+              },
               inputFormatters: [
                 FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
+                TextInputFormatter.withFunction((old, next) {
+                  if ('.'.allMatches(next.text).length > 1) return old;
+                  return next;
+                }),
               ],
               style: theme.textTheme.headlineSmall,
               decoration: InputDecoration(
                 prefixText: '৳ ',
                 labelText: 'Amount (Tk)',
+                errorText: _amountError,
                 prefixIcon: Icon(isExpense ? Icons.south_west : Icons.north_east,
                     color: isExpense ? theme.colorScheme.error : Colors.green),
               ),
@@ -315,13 +379,64 @@ class _AddTransactionFormState extends ConsumerState<_AddTransactionForm> {
               ),
             ),
             const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              decoration: BoxDecoration(
+                color: (isExpense ? theme.colorScheme.error : Colors.green)
+                    .withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: (isExpense ? theme.colorScheme.error : Colors.green)
+                      .withValues(alpha: 0.25),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(isExpense ? Icons.south_west : Icons.north_east,
+                      size: 18,
+                      color:
+                          isExpense ? theme.colorScheme.error : Colors.green),
+                  const SizedBox(width: 8),
+                  Text(
+                    '${isExpense ? 'Expense' : 'Income'}: '
+                    '${Format.tk(double.tryParse(_amountCtrl.text.trim()) ?? 0)}',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 14,
+                      color:
+                          isExpense ? theme.colorScheme.error : Colors.green,
+                    ),
+                  ),
+                  const Spacer(),
+                  Text(_category,
+                      style: theme.textTheme.bodySmall
+                          ?.copyWith(color: Colors.grey)),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
             FilledButton.icon(
-              onPressed: _save,
+              onPressed: _saving ? null : _save,
               style: FilledButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 16),
+                backgroundColor:
+                    isExpense ? theme.colorScheme.error : Colors.green,
+                disabledBackgroundColor:
+                    (isExpense ? theme.colorScheme.error : Colors.green)
+                        .withValues(alpha: 0.5),
               ),
-              icon: const Icon(Icons.check),
-              label: Text(widget.existing == null ? 'Save' : 'Update'),
+              icon: _saving
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2.2, color: Colors.white))
+                  : const Icon(Icons.check),
+              label: Text(_saving
+                  ? 'Saving…'
+                  : widget.existing == null
+                      ? 'Save'
+                      : 'Update'),
             ),
           ],
         ),

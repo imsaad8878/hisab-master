@@ -28,6 +28,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final transactions = ref.watch(transactionsProvider).valueOrNull ?? [];
     final totals = ref.watch(totalsProvider);
     final user = ref.watch(displayUserProvider);
+    final pending = ref.watch(pendingSyncProvider).valueOrNull ?? 0;
     final theme = Theme.of(context);
 
     final visible = transactions.where((t) {
@@ -53,6 +54,35 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             onProfileTap: () =>
                 ref.read(navIndexProvider.notifier).state = 2,
           ),
+          if (pending > 0)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
+                  color: Colors.amber.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                      color: Colors.amber.withValues(alpha: 0.5)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.cloud_sync_outlined,
+                        size: 18, color: Colors.orange),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        '$pending change(s) waiting for internet — data '
+                        'safe on this device',
+                        style: const TextStyle(
+                            fontSize: 12.5, fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
             child: Row(
