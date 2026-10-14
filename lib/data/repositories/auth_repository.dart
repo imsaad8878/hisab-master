@@ -141,6 +141,22 @@ class AuthRepository {
     await FirebaseAuth.instance.currentUser?.sendEmailVerification();
   }
 
+  /// Sends a password-reset link to [email].
+  /// Returns '' on success, otherwise an error message.
+  Future<String> sendPasswordResetEmail(String email) async {
+    if (!FirebaseService.ready) return _firebaseNotConfigured;
+    final clean = email.trim();
+    if (clean.isEmpty || !clean.contains('@')) {
+      return 'Email ta thik nai.';
+    }
+    try {
+      await FirebaseAuth.instance.sendPasswordResetEmail(email: clean);
+      return '';
+    } on FirebaseAuthException catch (e) {
+      return _message(e);
+    }
+  }
+
   /// Returns null on success, otherwise an error message.
   Future<String?> updatePassword(String newPassword) async {
     if (!FirebaseService.ready) {

@@ -66,6 +66,74 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     }
   }
 
+  Future<void> _forgotPassword() async {
+    final controller = TextEditingController(text: _emailCtrl.text.trim());
+    final email = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Forgot password?'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Apnar account er email likhun. Amra ekta password reset '
+              'link email e pathabo.',
+              style: TextStyle(fontSize: 13.5),
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: controller,
+              autofocus: true,
+              keyboardType: TextInputType.emailAddress,
+              autocorrect: false,
+              decoration: const InputDecoration(
+                labelText: 'Email',
+                prefixIcon: Icon(Icons.alternate_email, size: 20),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel')),
+          FilledButton(
+              onPressed: () => Navigator.pop(ctx, controller.text),
+              child: const Text('Send link')),
+        ],
+      ),
+    );
+    if (email == null || !mounted) return;
+    final err =
+        await ref.read(authRepositoryProvider).sendPasswordResetEmail(email);
+    if (!mounted) return;
+    if (err.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: const Color(0xFF2E7D32),
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        content: Row(
+          children: [
+            const Icon(Icons.mark_email_read_outlined,
+                color: Colors.white, size: 20),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'Reset link $email e pathano hoyeche. Inbox ba Spam dekhen.',
+                style: const TextStyle(
+                    color: Colors.white, fontWeight: FontWeight.w600),
+              ),
+            ),
+          ],
+        ),
+      ));
+    } else {
+      _showError(err);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     ref.listen(authStateChangesProvider, (prev, next) {
@@ -242,7 +310,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                 ),
                               ),
                             ),
-                            const SizedBox(height: 14),
+                            if (!_registerMode)
+                              Align(
+                                alignment: Alignment.centerRight,
+                                child: TextButton.icon(
+                                  onPressed: _busy ? null : _forgotPassword,
+                                  icon: const Icon(Icons.help_outline,
+                                      size: 16),
+                                  label: const Text('Forgot password?'),
+                                ),
+                              ),
+                            const SizedBox(height: 8),
                             FilledButton(
                               onPressed: _busy ? null : _email,
                               style: FilledButton.styleFrom(
