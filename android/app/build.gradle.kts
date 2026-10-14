@@ -8,7 +8,7 @@ plugins {
 
 android {
     namespace = "com.saad.hisabmaster"
-    compileSdk = flutter.compileSdkVersion
+    compileSdk = 36
     ndkVersion = flutter.ndkVersion
 
     compileOptions {

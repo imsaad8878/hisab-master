@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../models/transaction.dart';
 import '../../../providers/transaction_providers.dart';
+import '../../../utils/export.dart';
 import '../../../utils/format.dart';
 
 enum _Period { month, year, all }
@@ -75,6 +76,16 @@ class _ReportScreenState extends ConsumerState<ReportScreen> {
       appBar: AppBar(
         title: const Text('Report'),
         actions: [
+          IconButton(
+            tooltip: 'Share PDF',
+            icon: const Icon(Icons.picture_as_pdf_outlined),
+            onPressed: () => shareTransactionsPdf(list, title),
+          ),
+          IconButton(
+            tooltip: 'Share CSV (Excel)',
+            icon: const Icon(Icons.table_chart_outlined),
+            onPressed: () => shareTransactionsCsv(list),
+          ),
           IconButton(
             tooltip: 'Copy report',
             icon: const Icon(Icons.copy_all_outlined),

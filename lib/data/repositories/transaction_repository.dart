@@ -185,6 +185,16 @@ class TransactionRepository {
     await _col(uid).doc(t.id).set(t.toMap());
   }
 
+  /// True when an entry with this id already exists (cloud or local).
+  Future<bool> exists(String uid, String id) async {
+    if (!FirebaseService.useLocal) {
+      await initLocal();
+      return _localCache.any((x) => x.id == id);
+    }
+    final doc = await _col(uid).doc(id).get();
+    return doc.exists;
+  }
+
   Future<void> updateTransaction(String uid, TransactionModel t) async {
     if (!FirebaseService.useLocal) {
       await initLocal();

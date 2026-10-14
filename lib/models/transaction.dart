@@ -10,6 +10,8 @@ class TransactionModel {
     required this.category,
     required this.dateTime,
     this.note = '',
+    this.photo,
+    this.recurringId,
   });
 
   final String id;
@@ -19,12 +21,20 @@ class TransactionModel {
   final DateTime dateTime;
   final String note;
 
+  /// Base64-compressed bill photo (optional).
+  final String? photo;
+
+  /// Id of the recurring rule that generated this entry (optional).
+  final String? recurringId;
+
   TransactionModel copyWith({
     double? amount,
     TransactionType? type,
     String? category,
     DateTime? dateTime,
     String? note,
+    String? photo,
+    String? recurringId,
   }) {
     return TransactionModel(
       id: id,
@@ -33,6 +43,8 @@ class TransactionModel {
       category: category ?? this.category,
       dateTime: dateTime ?? this.dateTime,
       note: note ?? this.note,
+      photo: photo ?? this.photo,
+      recurringId: recurringId ?? this.recurringId,
     );
   }
 
@@ -42,6 +54,8 @@ class TransactionModel {
         'category': category,
         'dateTime': dateTime.toIso8601String(),
         'note': note,
+        if (photo != null && photo!.isNotEmpty) 'photo': photo,
+        if (recurringId != null) 'recurringId': recurringId,
       };
 
   factory TransactionModel.fromMap(String id, Map<String, dynamic> map) {
@@ -53,6 +67,8 @@ class TransactionModel {
       dateTime:
           DateTime.tryParse(map['dateTime'] as String? ?? '') ?? DateTime.now(),
       note: map['note'] as String? ?? '',
+      photo: map['photo'] as String?,
+      recurringId: map['recurringId'] as String?,
     );
   }
 }

@@ -1,15 +1,20 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app.dart' show kBrandGradient, kBrandText;
+import '../../../core/widget/home_widget_helper.dart';
 import '../../../models/app_user.dart';
 import '../../../models/transaction.dart';
 import '../../../providers/auth_providers.dart';
+import '../../../providers/loan_providers.dart';
 import '../../../providers/profile_providers.dart';
 import '../../../providers/transaction_providers.dart';
 import '../../../utils/avatar.dart';
 import '../../../utils/format.dart';
 import '../../add/presentation/add_transaction_sheet.dart';
+import '../../loan/presentation/loan_screen.dart';
 
 enum _Filter { all, income, expense }
 
@@ -22,24 +27,41 @@ class HomeScreen extends ConsumerStatefulWidget {
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
   _Filter _filter = _Filter.all;
+  bool _searchOn = false;
+  String _query = '';
+  final _searchCtrl = TextEditingController();
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
+    registerHomeWidgetUpdates(ref);
     final transactions = ref.watch(transactionsProvider).valueOrNull ?? [];
     final totals = ref.watch(totalsProvider);
     final user = ref.watch(displayUserProvider);
     final pending = ref.watch(pendingSyncProvider).valueOrNull ?? 0;
+    final budget =
+        (ref.watch(profileDocProvider).valueOrNull?['monthlyBudget'] as num?)
+                ?.toDouble() ??
+            0;
     final theme = Theme.of(context);
 
+    final q = _query.trim().toLowerCase();
     final visible = transactions.where((t) {
-      switch (_filter) {
-        case _Filter.all:
-          return true;
-        case _Filter.income:
-          return t.type == TransactionType.income;
-        case _Filter.expense:
-          return t.type == TransactionType.expense;
-      }
+      final passType = switch (_filter) {
+        _Filter.all => true,
+        _Filter.income => t.type == TransactionType.income,
+        _Filter.expense => t.type == TransactionType.expense,
+      };
+      if (!passType) return false;
+      if (q.isEmpty) return true;
+      return t.category.toLowerCase().contains(q) ||
+          t.note.toLowerCase().contains(q) ||
+          t.amount.toStringAsFixed(0).contains(q);
     }).toList();
 
     return Scaffold(
@@ -109,20 +131,62 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               ],
             ),
           ),
+          if (budget > 0) ...[
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+              child: _BudgetCard(
+                  budget: budget, spent: totals.monthExpense),
+            ),
+          ],
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+            child: _LoanCard(onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const LoanScreen()))),
+          ),
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 22, 20, 10),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('Transactions',
-                    style: theme.textTheme.titleMedium
-                        ?.copyWith(fontWeight: FontWeight.bold)),
+                Expanded(
+                  child: Text('Transactions',
+                      style: theme.textTheme.titleMedium
+                          ?.copyWith(fontWeight: FontWeight.bold)),
+                ),
+                IconButton(
+                  visualDensity: VisualDensity.compact,
+                  onPressed: () => setState(() {
+                    _searchOn = !_searchOn;
+                    if (!_searchOn) {
+                      _query = '';
+                      _searchCtrl.clear();
+                    }
+                  }),
+                  icon: Icon(_searchOn ? Icons.close : Icons.search,
+                      size: 20, color: Colors.grey),
+                ),
                 Text('${visible.length} shown',
                     style: theme.textTheme.bodySmall
                         ?.copyWith(color: Colors.grey)),
               ],
             ),
           ),
+          if (_searchOn)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: TextField(
+                controller: _searchCtrl,
+                autofocus: true,
+                onChanged: (v) => setState(() => _query = v),
+                decoration: InputDecoration(
+                  hintText: 'Search note, category, amount…',
+                  prefixIcon: const Icon(Icons.search, size: 20),
+                  isDense: true,
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14)),
+                  contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                ),
+              ),
+            ),
           if (visible.isEmpty)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 48),
@@ -488,6 +552,108 @@ class _SummaryCard extends StatelessWidget {
   }
 }
 
+class _BudgetCard extends StatelessWidget {
+  const _BudgetCard({required this.budget, required this.spent});
+
+  final double budget;
+  final double spent;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final ratio = (spent / budget).clamp(0.0, 1.0);
+    final color = ratio >= 1.0
+        ? theme.colorScheme.error
+        : ratio >= 0.8
+            ? Colors.orange
+            : kBrandText;
+    final remaining = budget - spent;
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.savings_outlined, size: 16, color: color),
+                const SizedBox(width: 6),
+                Text('Monthly Budget', style: theme.textTheme.titleSmall),
+                const Spacer(),
+                Text(
+                  remaining >= 0
+                      ? '${Format.tk(remaining)} left'
+                      : '${Format.tk(-remaining)} over',
+                  style: TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w700,
+                      color: color),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: LinearProgressIndicator(
+                value: ratio,
+                minHeight: 8,
+                color: color,
+                backgroundColor: color.withValues(alpha: 0.15),
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              '${Format.tk(spent)} of ${Format.tk(budget)} spent',
+              style: TextStyle(fontSize: 11.5, color: Colors.grey.shade600),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _LoanCard extends ConsumerWidget {
+  const _LoanCard({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final (given, taken) = ref.watch(loanSummaryProvider);
+    final net = given - taken;
+    if (given == 0 && taken == 0) {
+      return const SizedBox.shrink();
+    }
+    final theme = Theme.of(context);
+    return Card(
+      child: ListTile(
+        onTap: onTap,
+        dense: true,
+        leading: Container(
+          width: 42,
+          height: 42,
+          decoration: BoxDecoration(
+            color: (net >= 0 ? Colors.green : theme.colorScheme.error)
+                .withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Icon(Icons.handshake_outlined,
+              color: net >= 0 ? Colors.green[800] : theme.colorScheme.error,
+              size: 20),
+        ),
+        title: const Text('দাম-পাওনা',
+            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+        subtitle: Text(
+          'পাবেন: ${Format.tk(given)}  •  দিবেন: ${Format.tk(taken)}',
+          style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+        ),
+        trailing: const Icon(Icons.chevron_right, size: 20),
+      ),
+    );
+  }
+}
+
 class _MiniRow extends StatelessWidget {
   const _MiniRow({required this.icon, required this.color, required this.value});
 
@@ -578,8 +744,34 @@ class _TransactionTile extends ConsumerWidget {
                     isIncome ? Colors.green[800] : theme.colorScheme.onErrorContainer,
                 size: 21),
           ),
-          title: Text(t.category,
-              style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w600)),
+          title: Row(
+            children: [
+              Expanded(
+                child: Text(t.category,
+                    style: const TextStyle(
+                        fontSize: 14.5, fontWeight: FontWeight.w600)),
+              ),
+              if (t.photo != null && t.photo!.isNotEmpty)
+                GestureDetector(
+                  onTap: () => showDialog<void>(
+                    context: context,
+                    builder: (ctx) => Dialog(
+                      child: InteractiveViewer(
+                        child: Image.memory(
+                          base64Decode(t.photo!),
+                          errorBuilder: (_, __, ___) => const Padding(
+                            padding: EdgeInsets.all(24),
+                            child: Text('Photo unavailable'),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  child: const Icon(Icons.photo_camera_back,
+                      size: 15, color: Colors.blueGrey),
+                ),
+            ],
+          ),
           subtitle: Text(
             t.note.isEmpty
                 ? '${Format.date(t.dateTime)} • ${Format.time(t.dateTime)}'

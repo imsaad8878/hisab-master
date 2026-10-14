@@ -81,6 +81,10 @@ class UserProfileRepository {
   Future<void> setPhoto(String uid, String? base64) =>
       _write(uid, {'photo': base64});
 
+  /// Monthly expense budget. Pass 0 (or null) to clear it.
+  Future<void> setBudget(String uid, double? amount) =>
+      _write(uid, {'monthlyBudget': (amount ?? 0) <= 0 ? null : amount});
+
   /// One-time copy of the on-device profile (name/photo) into Firestore.
   Future<void> ensureMigratedToCloud(String uid) async {
     if (_migrated) return;

@@ -1,12 +1,19 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
 
+import '../../../data/repositories/loan_repository.dart';
 import '../../../data/repositories/transaction_repository.dart';
 import '../../../models/category_tag.dart';
+import '../../../models/loan.dart';
 import '../../../models/transaction.dart';
 import '../../../providers/auth_providers.dart';
 import '../../../providers/category_providers.dart';
+import '../../../providers/loan_providers.dart';
+import '../../../providers/profile_providers.dart';
 import '../../../providers/transaction_providers.dart';
 import '../../../utils/format.dart';
 
@@ -45,6 +52,9 @@ class _AddTransactionFormState extends ConsumerState<_AddTransactionForm> {
   final _noteCtrl = TextEditingController();
   bool _saving = false;
   String? _amountError;
+  String? _photo;
+  bool _recurring = false;
+  int _recurringDay = DateTime.now().day.clamp(1, 28);
 
   List<String> _categoriesFor(TransactionType t) {
     final customs =
@@ -66,6 +76,8 @@ class _AddTransactionFormState extends ConsumerState<_AddTransactionForm> {
         : widget.existing!.amount
             .toStringAsFixed(widget.existing!.amount % 1 == 0 ? 0 : 2);
     _noteCtrl.text = widget.existing?.note ?? '';
+    _photo = widget.existing?.photo;
+    _recurring = widget.existing?.recurringId != null;
     if (!_categoriesFor(_type).contains(_category)) {
       _category = _categoriesFor(_type).first;
     }
@@ -179,6 +191,29 @@ class _AddTransactionFormState extends ConsumerState<_AddTransactionForm> {
     }
   }
 
+  Future<void> _pickPhoto(ImageSource source) async {
+    try {
+      final picked = await ImagePicker().pickImage(
+        source: source,
+        maxWidth: 1000,
+        imageQuality: 60,
+      );
+      if (picked == null) return;
+      final bytes = await picked.readAsBytes();
+      if (bytes.length > 800 * 1024) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Photo khub boro — onno akta try korun.')));
+        return;
+      }
+      setState(() => _photo = base64Encode(bytes));
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Photo nite parini.')));
+    }
+  }
+
   Future<void> _save() async {
     if (_saving) return; // double-tap e duplicate entry hobe na
     final amount = double.tryParse(_amountCtrl.text.trim());
@@ -186,12 +221,68 @@ class _AddTransactionFormState extends ConsumerState<_AddTransactionForm> {
       setState(() => _amountError = 'Ekta thik amount likhun (৳ 0 er beshi).');
       return;
     }
+    // Budget warning before saving an expense that crosses the monthly limit.
+    if (_type == TransactionType.expense && widget.existing == null) {
+      final budget =
+          (ref.read(profileDocProvider).valueOrNull?['monthlyBudget'] as num?)
+                  ?.toDouble() ??
+              0;
+      if (budget > 0) {
+        final spent = ref.read(totalsProvider).monthExpense;
+        final after = spent + amount;
+        if (after > budget) {
+          final ok = await showDialog<bool>(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              icon: const Icon(Icons.warning_amber_rounded,
+                  color: Colors.orange, size: 36),
+              title: const Text('Budget cross hobe!'),
+              content: Text(
+                'Ei month budget ${Format.tk(budget)} — ekhon porjonto '
+                '${Format.tk(spent)} kharcha hoyeche.\n\n'
+                'Ei ${Format.tk(amount)} save korle total ${Format.tk(after)} '
+                'hobe, budget er ${Format.tk(after - budget)} beshi!',
+              ),
+              actions: [
+                TextButton(
+                    onPressed: () => Navigator.pop(ctx, false),
+                    child: const Text('Firo')),
+                FilledButton(
+                    onPressed: () => Navigator.pop(ctx, true),
+                    child: const Text('Thik ase, save koro')),
+              ],
+            ),
+          );
+          if (ok != true) return;
+        }
+      }
+    }
     setState(() {
       _saving = true;
       _amountError = null;
     });
     final repo = ref.read(transactionRepositoryProvider);
     final uid = ref.read(dataUidProvider);
+
+    String? recurringId = widget.existing?.recurringId;
+    if (_recurring && widget.existing == null) {
+      final rule = RecurringRule(
+        id: LoanRepository.newId(),
+        amount: amount,
+        type: _type.name,
+        category: _category,
+        dayOfMonth: _recurringDay,
+        note: _noteCtrl.text.trim(),
+      );
+      await ref.read(recurringRepositoryProvider).saveRule(uid, rule);
+      recurringId = rule.id;
+    } else if (!_recurring && widget.existing?.recurringId != null) {
+      await ref
+          .read(recurringRepositoryProvider)
+          .deleteRule(uid, widget.existing!.recurringId!);
+      recurringId = null;
+    }
+
     final model = TransactionModel(
       id: widget.existing?.id ?? TransactionRepository.newId(),
       amount: amount,
@@ -199,7 +290,10 @@ class _AddTransactionFormState extends ConsumerState<_AddTransactionForm> {
       category: _category,
       dateTime: _date,
       note: _noteCtrl.text.trim(),
+      photo: _photo,
+      recurringId: recurringId,
     );
+    if (!mounted) return;
     final messenger = ScaffoldMessenger.of(context);
     final theme = Theme.of(context);
     try {
@@ -378,6 +472,81 @@ class _AddTransactionFormState extends ConsumerState<_AddTransactionForm> {
                 prefixIcon: Icon(Icons.sticky_note_2_outlined),
               ),
             ),
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => _pickPhoto(ImageSource.camera),
+                    icon: const Icon(Icons.camera_alt_outlined, size: 18),
+                    label: const Text('Bill photo'),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => _pickPhoto(ImageSource.gallery),
+                    icon: const Icon(Icons.photo_outlined, size: 18),
+                    label: const Text('Gallery'),
+                  ),
+                ),
+              ],
+            ),
+            if (_photo != null) ...[
+              const SizedBox(height: 10),
+              Stack(
+                alignment: Alignment.topRight,
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: Image.memory(
+                      base64Decode(_photo!),
+                      height: 120,
+                      width: double.infinity,
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => setState(() => _photo = null),
+                    icon: const Icon(Icons.cancel, color: Colors.white),
+                    style: IconButton.styleFrom(backgroundColor: Colors.black45),
+                  ),
+                ],
+              ),
+            ],
+            const SizedBox(height: 4),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              value: _recurring,
+              onChanged: (v) => setState(() => _recurring = v),
+              title: const Text('Repeat every month',
+                  style: TextStyle(fontSize: 14)),
+              subtitle: const Text('Rent, salary — bar bar likhte hobe na',
+                  style: TextStyle(fontSize: 12)),
+              secondary: const Icon(Icons.repeat),
+            ),
+            if (_recurring)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Row(
+                  children: [
+                    const Text('Day: ', style: TextStyle(fontSize: 13)),
+                    DropdownButton<int>(
+                      value: _recurringDay,
+                      items: [
+                        for (var d = 1; d <= 28; d++)
+                          DropdownMenuItem(value: d, child: Text('$d')),
+                      ],
+                      onChanged: (d) =>
+                          setState(() => _recurringDay = d ?? _recurringDay),
+                    ),
+                    const SizedBox(width: 8),
+                    Text('of every month',
+                        style: TextStyle(
+                            fontSize: 12.5, color: Colors.grey.shade600)),
+                  ],
+                ),
+              ),
             const SizedBox(height: 8),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),

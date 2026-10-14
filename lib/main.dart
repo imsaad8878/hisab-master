@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'app.dart';
 import 'core/firebase/firebase_bootstrap.dart';
+import 'core/security/app_lock_gate.dart';
 import 'firebase_options.dart';
 
 Future<void> main() async {
@@ -23,5 +24,7 @@ Future<void> main() async {
     FirebaseService.ready = false;
     FirebaseService.initError = e.toString();
   }
-  runApp(const ProviderScope(child: HisabMasterApp()));
+  runApp(ProviderScope(
+    child: AppLockGate(child: const HisabMasterApp()),
+  ));
 }

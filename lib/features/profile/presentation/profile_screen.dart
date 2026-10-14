@@ -1,3 +1,6 @@
+import 'dart:convert';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -6,11 +9,17 @@ import 'package:image_picker/image_picker.dart';
 import '../../../app.dart' show kBrandGradient, kBrandText;
 import '../../../core/firebase/firebase_bootstrap.dart';
 import '../../../core/firebase/firebase_options_fallback.dart';
+import '../../../core/security/app_security.dart';
 import '../../../data/repositories/user_profile_repository.dart';
+import '../../../models/loan.dart';
+import '../../../models/transaction.dart';
 import '../../../providers/auth_providers.dart';
+import '../../../providers/loan_providers.dart';
 import '../../../providers/profile_providers.dart';
 import '../../../providers/transaction_providers.dart';
 import '../../../utils/avatar.dart';
+import '../../../utils/export.dart';
+import '../../../utils/format.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
@@ -21,6 +30,7 @@ class ProfileScreen extends ConsumerStatefulWidget {
 
 class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   bool _rechecking = false;
+  bool _hasPin = false;
 
   @override
   void initState() {
@@ -28,6 +38,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     // Email verify korle app e status ta cache thake — agei ekbar reload
     // nite hobe, nahole verify koreo "Email not verified" dekhay.
     Future.microtask(() => ref.read(authRepositoryProvider).refreshUser());
+    AppSecurity.hasPin().then((v) {
+      if (mounted) setState(() => _hasPin = v);
+    });
   }
 
   /// Re-reads the account from Firebase so a verified Gmail shows as
@@ -69,6 +82,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   Widget build(BuildContext context) {
     final user = ref.watch(displayUserProvider);
     final pending = ref.watch(pendingSyncProvider).valueOrNull ?? 0;
+    final budgetValue =
+        (ref.watch(profileDocProvider).valueOrNull?['monthlyBudget'] as num?)
+                ?.toDouble() ??
+            0;
     final theme = Theme.of(context);
 
     Future<void> logout() async {
@@ -248,6 +265,243 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               .showSnackBar(SnackBar(content: Text('Photo neoa jay ni: $e')));
         }
       }
+    }
+
+    Future<void> setBudget() async {
+      final current =
+          (ref.read(profileDocProvider).valueOrNull?['monthlyBudget'] as num?)
+                  ?.toDouble() ??
+              0;
+      final controller = TextEditingController(
+          text: current > 0 ? current.toStringAsFixed(0) : '');
+      final value = await showDialog<String>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Monthly budget'),
+          content: TextField(
+            controller: controller,
+            autofocus: true,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(
+              prefixText: '৳ ',
+              labelText: 'This month you can spend',
+              helperText: 'Limit er agei warning pabe. 0 dile budget off.',
+            ),
+          ),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Cancel')),
+            FilledButton(
+                onPressed: () => Navigator.pop(ctx, controller.text),
+                child: const Text('Save')),
+          ],
+        ),
+      );
+      if (value == null) return;
+      final amount = double.tryParse(value.trim()) ?? 0;
+      await ref
+          .read(userProfileRepositoryProvider)
+          .setBudget(ref.read(dataUidProvider), amount);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(
+                amount > 0 ? 'Budget set: ${Format.tk(amount)}/month' : 'Budget off.')));
+      }
+    }
+
+    Future<void> setupPin({bool change = false}) async {
+      final ctrl = TextEditingController();
+      final pin = await showDialog<String>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text(change ? 'Change PIN' : 'Set app lock PIN'),
+          content: TextField(
+            controller: ctrl,
+            autofocus: true,
+            keyboardType: TextInputType.number,
+            obscureText: true,
+            maxLength: 6,
+            decoration: const InputDecoration(
+                hintText: '4–6 digit PIN', counterText: ''),
+          ),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Cancel')),
+            FilledButton(
+                onPressed: () => Navigator.pop(ctx, ctrl.text),
+                child: const Text('Save')),
+          ],
+        ),
+      );
+      if (pin == null) return;
+      if (pin.length < 4 || pin.length > 6 || int.tryParse(pin) == null) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+              content: Text('PIN 4–6 digit er hote hobe.')));
+        }
+        return;
+      }
+      await AppSecurity.setPin(pin);
+      if (mounted) setState(() => _hasPin = true);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('App lock চালু!')));
+      }
+    }
+
+    Future<void> removePin() async {
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Remove app lock?'),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Cancel')),
+            FilledButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('Remove')),
+          ],
+        ),
+      );
+      if (ok == true) {
+        await AppSecurity.clearPin();
+        if (mounted) setState(() => _hasPin = false);
+      }
+    }
+
+    Future<void> toggleBiometric(bool on) async {
+      await AppSecurity.setBiometricEnabled(on);
+      if (context.mounted) setState(() {});
+    }
+
+    Future<void> exportBackup() async {
+      final txs = ref.read(transactionsProvider).valueOrNull ?? const [];
+      final loans = ref.read(loansProvider).valueOrNull ?? const [];
+      final rules = ref.read(recurringRulesProvider).valueOrNull ?? const [];
+      final profile =
+          ref.read(profileDocProvider).valueOrNull ?? const <String, dynamic>{};
+      final json = buildBackupJson(
+          transactions: txs, loans: loans, recurring: rules, profile: profile);
+      await shareBackupFile(json);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('Backup file share/save kore rakhun.')));
+      }
+    }
+
+    Future<void> restoreBackup() async {
+      final picked = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['json'],
+        withData: true,
+      );
+      final file = picked?.files.first;
+      if (file == null) return;
+      try {
+        final text = utf8.decode(file.bytes ?? const <int>[]);
+        final data = jsonDecode(text) as Map<String, dynamic>;
+        if (data['app'] != 'hisab_master') {
+          throw const FormatException('not a Hisab Master backup');
+        }
+        final uid = ref.read(dataUidProvider);
+        final txRepo = ref.read(transactionRepositoryProvider);
+        final loanRepo = ref.read(loanRepositoryProvider);
+        final recRepo = ref.read(recurringRepositoryProvider);
+        var count = 0;
+        for (final m in (data['transactions'] as List? ?? const [])) {
+          if (m is! Map) continue;
+          final map = m.cast<String, dynamic>();
+          final id = (map['id'] as String?) ?? '';
+          if (id.isEmpty) continue;
+          if (await txRepo.exists(uid, id)) continue;
+          await txRepo.addTransaction(
+              uid, TransactionModel.fromMap(id, map));
+          count++;
+        }
+        for (final m in (data['loans'] as List? ?? const [])) {
+          if (m is! Map) continue;
+          final map = m.cast<String, dynamic>();
+          final id = (map['id'] as String?) ?? '';
+          if (id.isEmpty) continue;
+          await loanRepo.saveLoan(uid, LoanRecord.fromMap(id, map));
+        }
+        for (final m in (data['recurring'] as List? ?? const [])) {
+          if (m is! Map) continue;
+          final map = m.cast<String, dynamic>();
+          final id = (map['id'] as String?) ?? '';
+          if (id.isEmpty) continue;
+          await recRepo.saveRule(uid, RecurringRule.fromMap(id, map));
+        }
+        final profile = data['profile'];
+        if (profile is Map && profile['name'] != null) {
+          await ref
+              .read(userProfileRepositoryProvider)
+              .setName(uid, profile['name'] as String);
+        }
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+              content: Text('Restore complete — $count notun entry added.')));
+        }
+      } catch (e) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Restore kaj koreni: $e')));
+        }
+      }
+    }
+
+    Future<void> manageRecurring() async {
+      await showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Recurring entries'),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: Consumer(builder: (ctx, ref2, _) {
+              final rules =
+                  ref2.watch(recurringRulesProvider).valueOrNull ?? const [];
+              if (rules.isEmpty) {
+                return const Padding(
+                  padding: EdgeInsets.all(16),
+                  child: Text(
+                      'Add transaction e "Repeat every month" on korle '
+                      'rule ekhane dekhabe.',
+                      style: TextStyle(fontSize: 13)),
+                );
+              }
+              return ListView.builder(
+                shrinkWrap: true,
+                itemCount: rules.length,
+                itemBuilder: (_, i) {
+                  final r = rules[i];
+                  return ListTile(
+                    dense: true,
+                    leading: const Icon(Icons.repeat),
+                    title: Text(
+                        '${r.category} — ${Format.tk(r.amount)}/month'),
+                    subtitle:
+                        Text('Day ${r.dayOfMonth} • ${r.type}'),
+                    trailing: IconButton(
+                      icon: const Icon(Icons.delete_outline, size: 20),
+                      onPressed: () => ref2
+                          .read(recurringRepositoryProvider)
+                          .deleteRule(ref2.read(dataUidProvider), r.id),
+                    ),
+                  );
+                },
+              );
+            }),
+          ),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Close')),
+          ],
+        ),
+      );
     }
 
     return Scaffold(
@@ -503,6 +757,77 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       : isFallbackOptions
                           ? 'Local demo mode (no Firebase yet)'
                           : 'Firebase Firestore'),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          Card(
+            child: Column(
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.savings_outlined),
+                  title: const Text('Monthly budget'),
+                  subtitle: Text(
+                    budgetValue > 0 ? Format.tk(budgetValue) : 'Set a limit',
+                    style: budgetValue > 0
+                        ? null
+                        : TextStyle(color: Colors.grey.shade500),
+                  ),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: setBudget,
+                ),
+                const Divider(height: 1, indent: 56),
+                ListTile(
+                  leading: const Icon(Icons.repeat),
+                  title: const Text('Recurring entries'),
+                  subtitle: const Text('Monthly rent, salary rules'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: manageRecurring,
+                ),
+                const Divider(height: 1, indent: 56),
+                ListTile(
+                  leading: const Icon(Icons.lock_outline),
+                  title: const Text('App lock'),
+                  subtitle: Text(_hasPin ? 'PIN lock চালু' : 'PIN দিয়ে lock করুন'),
+                  trailing: _hasPin
+                      ? TextButton(
+                          onPressed: removePin,
+                          child: Text('Remove',
+                              style:
+                                  TextStyle(color: theme.colorScheme.error)),
+                        )
+                      : const Icon(Icons.chevron_right),
+                  onTap: _hasPin ? () => setupPin(change: true) : setupPin,
+                ),
+                if (_hasPin) ...[
+                  const Divider(height: 1, indent: 56),
+                  FutureBuilder<bool>(
+                    future: AppSecurity.biometricEnabled(),
+                    builder: (ctx, snap) => SwitchListTile(
+                      secondary: const Icon(Icons.fingerprint),
+                      title: const Text('Fingerprint unlock'),
+                      subtitle: const Text('PIN er alternative'),
+                      value: snap.data ?? false,
+                      onChanged: toggleBiometric,
+                    ),
+                  ),
+                ],
+                const Divider(height: 1, indent: 56),
+                ListTile(
+                  leading: const Icon(Icons.backup_outlined),
+                  title: const Text('Backup (JSON file)'),
+                  subtitle: const Text('Share kore rakhun — restore o jabe'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: exportBackup,
+                ),
+                const Divider(height: 1, indent: 56),
+                ListTile(
+                  leading: const Icon(Icons.restore_outlined),
+                  title: const Text('Restore backup'),
+                  subtitle: const Text('Backup JSON file theke data ferot ana'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: restoreBackup,
                 ),
               ],
             ),
