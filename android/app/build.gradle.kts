@@ -17,7 +17,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.saad.hisabmaster"
+        applicationId = "com.saad.hisabmaster.app"
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         // Uses the version code from pubspec.yaml. When using split APKs, 1000 * ABI_VERSION

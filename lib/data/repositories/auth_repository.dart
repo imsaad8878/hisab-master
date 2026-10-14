@@ -10,7 +10,7 @@ import '../../models/app_user.dart';
 /// Authentication > Google (enabled) > "Copy" under Web client.
 /// Needed only for Google Sign-In to return an idToken on Android.
 const String kGoogleServerClientId =
-    '997907494291-se97be7fgbs221o5ggbd6buj4pjci8i8.apps.googleusercontent.com';
+    '273850587174-u7h7dk477jfuio45i2u3uhcqd9fvfk0u.apps.googleusercontent.com';
 
 AppUser _toAppUser(User u) => AppUser(
       uid: u.uid,

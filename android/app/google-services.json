@@ -7,9 +7,9 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:273850587174:android:c80c991708431a0c016ee7",
+        "mobilesdk_app_id": "1:273850587174:android:80d2ee1056648728016ee7",
         "android_client_info": {
-          "package_name": "com.saad.hisabmaster"
+          "package_name": "com.saad.hisabmaster.app"
         }
       },
       "oauth_client": [],
