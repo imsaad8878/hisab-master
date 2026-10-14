@@ -5,6 +5,7 @@ import '../../../providers/profile_providers.dart';
 import '../../analytics/presentation/analytics_screen.dart';
 import '../../profile/presentation/profile_screen.dart';
 import '../../add/presentation/add_transaction_sheet.dart';
+import '../../report/presentation/report_screen.dart';
 import 'home_screen.dart';
 
 class HomeShell extends ConsumerWidget {
@@ -19,10 +20,11 @@ class HomeShell extends ConsumerWidget {
         children: const [
           HomeScreen(),
           AnalyticsScreen(),
+          ReportScreen(),
           ProfileScreen(),
         ],
       ),
-      floatingActionButton: index == 2
+      floatingActionButton: index == 3
           ? null
           : FloatingActionButton.extended(
               onPressed: () => showAddTransactionSheet(context),
@@ -44,6 +46,11 @@ class HomeShell extends ConsumerWidget {
             icon: Icon(Icons.insights_outlined),
             selectedIcon: Icon(Icons.insights),
             label: 'Analytics',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.description_outlined),
+            selectedIcon: Icon(Icons.description),
+            label: 'Report',
           ),
           NavigationDestination(
             icon: Icon(Icons.person_outline),

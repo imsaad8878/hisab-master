@@ -23,7 +23,10 @@ class TransactionRepository {
 
   static const String _prefsKey = 'hisab_local_transactions_v1';
   static const String _backupKey = 'hisab_local_transactions_backup_v1';
-  static const String _migratedKey = 'hisab_cloud_migrated_v1';
+
+  /// Uid that owns the on-device entries (set after the first successful
+  /// merge into Firestore).
+  static const String _ownerKey = 'hisab_cloud_migrated_v1';
 
   static final math.Random _rand = math.Random();
 
@@ -202,35 +205,45 @@ class TransactionRepository {
     await _col(uid).doc(id).delete();
   }
 
-  /// One-time move of on-device demo data into Firestore after the first
-  /// Firebase login. Skips if the cloud already has entries, and only marks
-  /// itself done after a fully successful run (so a failed attempt retries).
+  /// Merges on-device entries into Firestore. Runs on every app start
+  /// (once per session), so anything added while offline is pushed to the
+  /// user's account as soon as they are online and signed in — entries are
+  /// matched by id, so nothing already in the cloud is duplicated.
   Future<void> ensureMigratedToCloud(String uid) async {
     if (_migrated) return;
     _migrated = true;
     try {
       final prefs = await SharedPreferences.getInstance();
-      if (prefs.getBool(_migratedKey) ?? false) return;
+      // Local data may belong to another account — never leak it across
+      // accounts on a shared device.
+      final owner = prefs.getString(_ownerKey);
+      if (owner != null && owner != uid) return;
       final raw = prefs.getString(_prefsKey);
       if (raw != null) {
         final list = (jsonDecode(raw) as List).cast<Map<String, dynamic>>();
         if (list.isNotEmpty) {
-          final remote = await _col(uid).get();
-          if (remote.docs.isEmpty) {
-            final batch = FirebaseFirestore.instance.batch();
-            for (final m in list) {
-              final id = (m['id'] as String?) ?? '';
-              if (id.isEmpty) continue;
-              final t = TransactionModel.fromMap(id, m);
-              // never push the auto-generated demo samples into a real account
-              if (t.amount <= 0 || t.note.startsWith('Demo:')) continue;
-              batch.set(_col(uid).doc(id), t.toMap());
+          final existing = await _col(uid).get();
+          final seen = {for (final d in existing.docs) d.id};
+          final batch = FirebaseFirestore.instance.batch();
+          var ops = 0;
+          for (final m in list) {
+            final id = (m['id'] as String?) ?? '';
+            if (id.isEmpty || seen.contains(id)) continue;
+            final t = TransactionModel.fromMap(id, m);
+            // never push the auto-generated demo samples into a real account
+            if (t.amount <= 0 || t.note.startsWith('Demo:')) continue;
+            batch.set(_col(uid).doc(id), t.toMap());
+            seen.add(id);
+            ops++;
+            if (ops >= 400) {
+              await batch.commit();
+              ops = 0;
             }
-            await batch.commit();
           }
+          if (ops > 0) await batch.commit();
         }
       }
-      await prefs.setBool(_migratedKey, true);
+      await prefs.setString(_ownerKey, uid);
     } catch (_) {
       _migrated = false; // retry on the next call/session
     }
