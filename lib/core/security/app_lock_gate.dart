@@ -64,8 +64,18 @@ class _AppLockGateState extends ConsumerState<AppLockGate>
         home: Scaffold(body: Center(child: CircularProgressIndicator())),
       );
     }
-    if (_locked) return LockScreen(onUnlocked: _unlock);
-    return widget.child;
+    // Keep the real app widget alive (just hidden) while locked — swapping
+    // it out entirely destroyed pending flows like the Google sign-in
+    // activity result when the lock re-engaged on resume.
+    return Stack(
+      children: [
+        Offstage(offstage: _locked, child: widget.child),
+        if (_locked)
+          Positioned.fill(
+            child: LockScreen(onUnlocked: _unlock),
+          ),
+      ],
+    );
   }
 }
 
@@ -91,8 +101,10 @@ class _LockScreenState extends State<LockScreen> {
   }
 
   Future<void> _init() async {
-    _pinLen = await AppSecurity.pinLength();
+    final len = await AppSecurity.pinLength();
     final enabled = await AppSecurity.biometricEnabled();
+    if (!mounted) return;
+    setState(() => _pinLen = len);
     if (!enabled) return;
     await _tryBiometric();
   }
@@ -166,10 +178,14 @@ class _LockScreenState extends State<LockScreen> {
               const SizedBox(height: 8),
               Text('Hisab Master locked',
                   style: theme.textTheme.titleMedium),
-              const SizedBox(height: 24),
+              const SizedBox(height: 4),
+              Text('$_pinLen digit PIN',
+                  style: TextStyle(
+                      color: Colors.grey.shade500, fontSize: 12.5)),
+              const SizedBox(height: 20),
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
-                children: List.generate(6, (i) {
+                children: List.generate(_pinLen, (i) {
                   final filled = i < _entered.length;
                   return AnimatedContainer(
                     duration: const Duration(milliseconds: 150),
