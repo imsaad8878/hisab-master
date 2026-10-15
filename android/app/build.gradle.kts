@@ -33,6 +33,11 @@ android {
             // TODO: Add your own signing config for the release build.
             // Signing with the debug keys for now, so `flutter run --release` works.
             signingConfig = signingConfigs.getByName("debug")
+            // R8 minification breaks androidx.work (WorkManager) Room
+            // database reflection on this device — keep it off until we
+            // add proper keep rules.
+            isMinifyEnabled = false
+            isShrinkResources = false
         }
     }
 }
