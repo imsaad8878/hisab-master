@@ -75,7 +75,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             filter: _filter,
             onFilter: (f) => setState(() => _filter = f),
             onProfileTap: () =>
-                ref.read(navIndexProvider.notifier).state = 3,
+                ref.read(navIndexProvider.notifier).state = 4,
           ),
           if (pending > 0)
             Padding(

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../providers/profile_providers.dart';
 import '../../analytics/presentation/analytics_screen.dart';
+import '../../notes/presentation/notes_screen.dart';
 import '../../profile/presentation/profile_screen.dart';
 import '../../add/presentation/add_transaction_sheet.dart';
 import '../../report/presentation/report_screen.dart';
@@ -21,10 +22,11 @@ class HomeShell extends ConsumerWidget {
           HomeScreen(),
           AnalyticsScreen(),
           ReportScreen(),
+          NotesScreen(),
           ProfileScreen(),
         ],
       ),
-      floatingActionButton: index == 3
+      floatingActionButton: index == 4
           ? null
           : FloatingActionButton.extended(
               onPressed: () => showAddTransactionSheet(context),
@@ -51,6 +53,11 @@ class HomeShell extends ConsumerWidget {
             icon: Icon(Icons.description_outlined),
             selectedIcon: Icon(Icons.description),
             label: 'Report',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.sticky_note_2_outlined),
+            selectedIcon: Icon(Icons.sticky_note_2),
+            label: 'Note',
           ),
           NavigationDestination(
             icon: Icon(Icons.person_outline),
