@@ -50,13 +50,14 @@ Future<void> shareTransactionsPdf(
         pw.TableHelper.fromTextArray(
           headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold),
           headerDecoration: const pw.BoxDecoration(color: PdfColors.grey300),
-          headers: ['Date', 'Type', 'Category', 'Note', 'Amount'],
+          headers: ['Date', 'Type', 'Category', 'Party', 'Note', 'Amount'],
           data: [
             for (final t in sorted)
               [
                 DateFormat('d MMM').format(t.dateTime),
                 t.type == TransactionType.income ? 'In' : 'Out',
                 t.category,
+                t.party ?? '',
                 t.note,
                 '${t.type == TransactionType.income ? '+' : '-'}${_bdt.format(t.amount)}',
               ],
@@ -86,11 +87,12 @@ pw.Widget _stat(String label, double value, PdfColor color) => pw.Column(
 
 String buildCsv(List<TransactionModel> list) {
   final sorted = [...list]..sort((a, b) => b.dateTime.compareTo(a.dateTime));
-  final buf = StringBuffer('Date,Type,Category,Note,Amount\n');
+  final buf = StringBuffer('Date,Type,Category,Party,Note,Amount\n');
   for (final t in sorted) {
     final note = t.note.replaceAll('"', "'").replaceAll(',', ' ');
+    final party = (t.party ?? '').replaceAll('"', "'").replaceAll(',', ' ');
     buf.writeln(
-        '"${DateFormat('yyyy-MM-dd HH:mm').format(t.dateTime)}","${t.type.name}","${t.category}","$note",${t.type == TransactionType.income ? '' : '-'}${t.amount.toStringAsFixed(0)}');
+        '"${DateFormat('yyyy-MM-dd HH:mm').format(t.dateTime)}","${t.type.name}","${t.category}","$party","$note",${t.type == TransactionType.income ? '' : '-'}${t.amount.toStringAsFixed(0)}');
   }
   return buf.toString();
 }

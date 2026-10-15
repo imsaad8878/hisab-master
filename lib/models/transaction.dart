@@ -12,6 +12,7 @@ class TransactionModel {
     this.note = '',
     this.photo,
     this.recurringId,
+    this.party,
   });
 
   final String id;
@@ -27,6 +28,10 @@ class TransactionModel {
   /// Id of the recurring rule that generated this entry (optional).
   final String? recurringId;
 
+  /// Person or business this money went to / came from
+  /// (e.g. "Rahim", "Bkash", "Boss"). Optional.
+  final String? party;
+
   TransactionModel copyWith({
     double? amount,
     TransactionType? type,
@@ -35,6 +40,7 @@ class TransactionModel {
     String? note,
     String? photo,
     String? recurringId,
+    String? party,
   }) {
     return TransactionModel(
       id: id,
@@ -45,6 +51,7 @@ class TransactionModel {
       note: note ?? this.note,
       photo: photo ?? this.photo,
       recurringId: recurringId ?? this.recurringId,
+      party: party ?? this.party,
     );
   }
 
@@ -56,6 +63,7 @@ class TransactionModel {
         'note': note,
         if (photo != null && photo!.isNotEmpty) 'photo': photo,
         if (recurringId != null) 'recurringId': recurringId,
+        if (party != null && party!.isNotEmpty) 'party': party,
       };
 
   factory TransactionModel.fromMap(String id, Map<String, dynamic> map) {
@@ -69,6 +77,7 @@ class TransactionModel {
       note: map['note'] as String? ?? '',
       photo: map['photo'] as String?,
       recurringId: map['recurringId'] as String?,
+      party: map['party'] as String?,
     );
   }
 }

@@ -1,16 +1,15 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:local_auth/local_auth.dart';
 
 import '../../core/security/app_security.dart';
 
-final appLockEnabledProvider = FutureProvider<bool>((ref) => AppSecurity.hasPin());
-
 /// Wraps the whole app. Shows the PIN/fingerprint screen whenever a lock
 /// is set — on cold start and every time the app returns to the
-/// foreground.
+/// foreground after being backgrounded.
 class AppLockGate extends ConsumerStatefulWidget {
   const AppLockGate({super.key, required this.child});
 
@@ -50,6 +49,8 @@ class _AppLockGateState extends ConsumerState<AppLockGate>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Re-lock every time the app comes back to the foreground so a
+    // different person holding the phone never sees the data.
     if (state == AppLifecycleState.resumed) _checkLock();
   }
 
@@ -81,19 +82,26 @@ class _LockScreenState extends State<LockScreen> {
   String _entered = '';
   String? _error;
   bool _bioAvailable = false;
+  int _pinLen = 4;
 
   @override
   void initState() {
     super.initState();
-    _tryBiometricOnStart();
+    _init();
   }
 
-  Future<void> _tryBiometricOnStart() async {
+  Future<void> _init() async {
+    _pinLen = await AppSecurity.pinLength();
     final enabled = await AppSecurity.biometricEnabled();
     if (!enabled) return;
-    final auth = LocalAuthentication();
+    await _tryBiometric();
+  }
+
+  Future<void> _tryBiometric() async {
     try {
-      final can = await auth.canCheckBiometrics || await auth.isDeviceSupported();
+      final auth = LocalAuthentication();
+      final can =
+          await auth.canCheckBiometrics || await auth.isDeviceSupported();
       if (!can) return;
       if (!mounted) return;
       setState(() => _bioAvailable = true);
@@ -111,15 +119,20 @@ class _LockScreenState extends State<LockScreen> {
       _entered += d;
       _error = null;
     });
-    if (_entered.length >= 4) {
+    // Verify exactly when the entered length matches the stored PIN
+    // length — this fixes the old bug where a wrong 4-digit PIN left the
+    // keypad stuck with no error.
+    if (_entered.length == _pinLen) {
       final ok = await AppSecurity.verifyPin(_entered);
       if (!mounted) return;
       if (ok) {
+        HapticFeedback.mediumImpact();
         widget.onUnlocked();
-      } else if (_entered.length >= 6) {
+      } else {
+        HapticFeedback.heavyImpact();
         setState(() {
           _entered = '';
-          _error = 'Wrong PIN';
+          _error = 'Wrong PIN — try again';
         });
       }
     }
@@ -127,7 +140,10 @@ class _LockScreenState extends State<LockScreen> {
 
   void _backspace() {
     if (_entered.isEmpty) return;
-    setState(() => _entered = _entered.substring(0, _entered.length - 1));
+    setState(() {
+      _entered = _entered.substring(0, _entered.length - 1);
+      _error = null;
+    });
   }
 
   @override
@@ -135,21 +151,28 @@ class _LockScreenState extends State<LockScreen> {
     final theme = Theme.of(context);
     return MaterialApp(
       debugShowCheckedModeBanner: false,
+      theme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF146C43)),
+        useMaterial3: true,
+      ),
       home: Scaffold(
         backgroundColor: theme.colorScheme.surface,
         body: SafeArea(
           child: Column(
             children: [
               const SizedBox(height: 48),
-              Icon(Icons.lock_outline, size: 48, color: theme.colorScheme.primary),
+              Icon(Icons.lock_outline,
+                  size: 48, color: theme.colorScheme.primary),
               const SizedBox(height: 8),
-              Text('Hisab Master locked', style: theme.textTheme.titleMedium),
+              Text('Hisab Master locked',
+                  style: theme.textTheme.titleMedium),
               const SizedBox(height: 24),
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: List.generate(6, (i) {
                   final filled = i < _entered.length;
-                  return Container(
+                  return AnimatedContainer(
+                    duration: const Duration(milliseconds: 150),
                     margin: const EdgeInsets.symmetric(horizontal: 6),
                     width: 14,
                     height: 14,
@@ -162,21 +185,28 @@ class _LockScreenState extends State<LockScreen> {
                   );
                 }),
               ),
-              if (_error != null) ...[
-                const SizedBox(height: 12),
-                Text(_error!, style: TextStyle(color: theme.colorScheme.error)),
-              ],
+              SizedBox(
+                height: 28,
+                child: _error == null
+                    ? null
+                    : Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Text(
+                          _error!,
+                          style: TextStyle(
+                              color: theme.colorScheme.error, fontSize: 13),
+                        ),
+                      ),
+              ),
               const Spacer(),
               if (_bioAvailable)
                 IconButton(
-                  onPressed: _tryBiometricOnStart,
-                  icon: const Icon(Icons.fingerprint, size: 40),
+                  onPressed: _tryBiometric,
+                  iconSize: 44,
+                  icon: const Icon(Icons.fingerprint),
                   tooltip: 'Use fingerprint',
                 ),
-              _Keypad(
-                onDigit: _onDigit,
-                onBackspace: _backspace,
-              ),
+              _Keypad(onDigit: _onDigit, onBackspace: _backspace),
               const SizedBox(height: 24),
             ],
           ),
@@ -194,16 +224,19 @@ class _Keypad extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    Widget key(String label, {VoidCallback? onTap, IconData? icon}) => SizedBox(
-          width: 72,
+    Widget key(String label, {VoidCallback? onTap, IconData? icon}) =>
+        SizedBox(
+          width: 76,
           height: 64,
           child: InkWell(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(16),
             onTap: onTap,
             child: Center(
               child: icon != null
                   ? Icon(icon, size: 26)
-                  : Text(label, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w500)),
+                  : Text(label,
+                      style: const TextStyle(
+                          fontSize: 24, fontWeight: FontWeight.w500)),
             ),
           ),
         );
@@ -223,7 +256,9 @@ class _Keypad extends StatelessWidget {
                 d == ''
                     ? key('')
                     : d == '<'
-                        ? key('', icon: Icons.backspace_outlined, onTap: onBackspace)
+                        ? key('',
+                            icon: Icons.backspace_outlined,
+                            onTap: onBackspace)
                         : key(d, onTap: () => onDigit(d)),
             ],
           ),

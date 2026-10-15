@@ -331,7 +331,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 child: const Text('Cancel')),
             FilledButton(
                 onPressed: () => Navigator.pop(ctx, ctrl.text),
-                child: const Text('Save')),
+                child: const Text('Next')),
           ],
         ),
       );
@@ -340,6 +340,40 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
               content: Text('PIN 4–6 digit er hote hobe.')));
+        }
+        return;
+      }
+      // Confirm PIN — bhul PIN set hoye gele app lock e atke jabe.
+      if (!mounted) return;
+      final confirmCtrl = TextEditingController();
+      final confirm = await showDialog<String>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Confirm PIN'),
+          content: TextField(
+            controller: confirmCtrl,
+            autofocus: true,
+            keyboardType: TextInputType.number,
+            obscureText: true,
+            maxLength: 6,
+            decoration: const InputDecoration(
+                hintText: 'abar PIN likhun', counterText: ''),
+          ),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Cancel')),
+            FilledButton(
+                onPressed: () => Navigator.pop(ctx, confirmCtrl.text),
+                child: const Text('Save')),
+          ],
+        ),
+      );
+      if (confirm == null) return;
+      if (confirm != pin) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+              content: Text('Duibar PIN alada — abar try korun.')));
         }
         return;
       }

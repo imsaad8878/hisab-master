@@ -61,6 +61,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       if (q.isEmpty) return true;
       return t.category.toLowerCase().contains(q) ||
           t.note.toLowerCase().contains(q) ||
+          (t.party?.toLowerCase().contains(q) ?? false) ||
           t.amount.toStringAsFixed(0).contains(q);
     }).toList();
 
@@ -773,10 +774,13 @@ class _TransactionTile extends ConsumerWidget {
             ],
           ),
           subtitle: Text(
-            t.note.isEmpty
-                ? '${Format.date(t.dateTime)} • ${Format.time(t.dateTime)}'
-                : '${t.note}\n${Format.date(t.dateTime)} • ${Format.time(t.dateTime)}',
-            maxLines: 2,
+            [
+              if (t.party != null && t.party!.isNotEmpty)
+                '${isIncome ? "থেকে" : "কে"} ${t.party}',
+              if (t.note.isNotEmpty) t.note,
+              '${Format.date(t.dateTime)} • ${Format.time(t.dateTime)}',
+            ].join('\n'),
+            maxLines: 3,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
           ),

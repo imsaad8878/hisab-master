@@ -50,6 +50,7 @@ class _AddTransactionFormState extends ConsumerState<_AddTransactionForm> {
   late DateTime _date = widget.existing?.dateTime ?? DateTime.now();
   final _amountCtrl = TextEditingController();
   final _noteCtrl = TextEditingController();
+  final _partyCtrl = TextEditingController();
   bool _saving = false;
   String? _amountError;
   String? _photo;
@@ -76,6 +77,7 @@ class _AddTransactionFormState extends ConsumerState<_AddTransactionForm> {
         : widget.existing!.amount
             .toStringAsFixed(widget.existing!.amount % 1 == 0 ? 0 : 2);
     _noteCtrl.text = widget.existing?.note ?? '';
+    _partyCtrl.text = widget.existing?.party ?? '';
     _photo = widget.existing?.photo;
     _recurring = widget.existing?.recurringId != null;
     if (!_categoriesFor(_type).contains(_category)) {
@@ -87,6 +89,7 @@ class _AddTransactionFormState extends ConsumerState<_AddTransactionForm> {
   void dispose() {
     _amountCtrl.dispose();
     _noteCtrl.dispose();
+    _partyCtrl.dispose();
     super.dispose();
   }
 
@@ -292,6 +295,7 @@ class _AddTransactionFormState extends ConsumerState<_AddTransactionForm> {
       note: _noteCtrl.text.trim(),
       photo: _photo,
       recurringId: recurringId,
+      party: _partyCtrl.text.trim().isEmpty ? null : _partyCtrl.text.trim(),
     );
     if (!mounted) return;
     final messenger = ScaffoldMessenger.of(context);
@@ -463,6 +467,20 @@ class _AddTransactionFormState extends ConsumerState<_AddTransactionForm> {
               ),
             ),
             const SizedBox(height: 12),
+            TextField(
+              controller: _partyCtrl,
+              textCapitalization: TextCapitalization.words,
+              maxLength: 40,
+              decoration: InputDecoration(
+                labelText: _type == TransactionType.expense
+                    ? 'কাকে দিলাম? (optional)'
+                    : 'কার কাছে পাইল? (optional)',
+                helperText: 'নাম, দোকান, ব্যাক্তি — যেকোনো',
+                prefixIcon: Icon(_type == TransactionType.expense
+                    ? Icons.person_off_outlined
+                    : Icons.person_add_alt_outlined),
+              ),
+            ),
             TextField(
               controller: _noteCtrl,
               textCapitalization: TextCapitalization.sentences,
