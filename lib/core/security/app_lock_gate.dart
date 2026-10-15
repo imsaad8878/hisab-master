@@ -67,14 +67,18 @@ class _AppLockGateState extends ConsumerState<AppLockGate>
     // Keep the real app widget alive (just hidden) while locked — swapping
     // it out entirely destroyed pending flows like the Google sign-in
     // activity result when the lock re-engaged on resume.
-    return Stack(
-      children: [
-        Offstage(offstage: _locked, child: widget.child),
-        if (_locked)
-          Positioned.fill(
-            child: LockScreen(onUnlocked: _unlock),
-          ),
-      ],
+    // Directionality is explicit because this Stack sits above MaterialApp.
+    return Directionality(
+      textDirection: TextDirection.ltr,
+      child: Stack(
+        children: [
+          Offstage(offstage: _locked, child: widget.child),
+          if (_locked)
+            Positioned.fill(
+              child: LockScreen(onUnlocked: _unlock),
+            ),
+        ],
+      ),
     );
   }
 }

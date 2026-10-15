@@ -26,13 +26,13 @@ class HomeShell extends ConsumerWidget {
           ProfileScreen(),
         ],
       ),
-      floatingActionButton: index == 4
-          ? null
-          : FloatingActionButton.extended(
+      floatingActionButton: index == 0
+          ? FloatingActionButton.extended(
               onPressed: () => showAddTransactionSheet(context),
               icon: const Icon(Icons.add),
               label: const Text('Add'),
-            ),
+            )
+          : null,
       floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       bottomNavigationBar: NavigationBar(
         selectedIndex: index,
